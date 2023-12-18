@@ -1,19 +1,21 @@
 import nltk
 import pickle
 import os.path
-from pycocotools.coco import COCO
 from collections import Counter
+
 
 class Vocabulary(object):
     # similar to get loader function from data_loader.py
-    def __init__(self,
+    def __init__(
+        self,
         vocab_threshold,
-        vocab_file='./vocab.pkl',
+        annotations,
+        vocab_file="./vocab.pkl",
         start_word="<start>",
         end_word="<end>",
         unk_word="<unk>",
-        annotations_file='../cocoapi/annotations/captions_train2014.json',
-        vocab_from_file=False):
+        vocab_from_file=False,
+    ):
         """Initialize the vocabulary.
         Args:
           vocab_threshold: Minimum word count threshold.
@@ -30,37 +32,36 @@ class Vocabulary(object):
         self.start_word = start_word
         self.end_word = end_word
         self.unk_word = unk_word
-        self.annotations_file = annotations_file
         self.vocab_from_file = vocab_from_file
-        self.get_vocab()
+        self.get_vocab(annotations)
 
-    def get_vocab(self):
+    def get_vocab(self, annotations):
         """Load the vocabulary from file OR build the vocabulary from scratch."""
         # if vocab_file (vocab.pkl) exists and we specified vocab_from_file = True
         if os.path.exists(self.vocab_file) & self.vocab_from_file:
             # open vocab.pkl fike in binary format for reading (rb)
-            with open(self.vocab_file, 'rb') as f:
+            with open(self.vocab_file, "rb") as f:
                 vocab = pickle.load(f)
                 # vocab.pkl file will have attributes, such as word2idx and idx2word
                 # we load vocabulary from file
                 self.word2idx = vocab.word2idx
                 self.idx2word = vocab.idx2word
-            print('Vocabulary successfully loaded from vocab.pkl file!')
+            print("Vocabulary successfully loaded from vocab.pkl file!")
         else:
             # build_vocab function will build vocabulary from scratch
             # by adding start, end, unknown words + captions
-            self.build_vocab()
-            with open(self.vocab_file, 'wb') as f:
+            self.build_vocab(annotations)
+            with open(self.vocab_file, "wb") as f:
                 pickle.dump(self, f)
-    
-    def build_vocab(self):
+
+    def build_vocab(self, annotations):
         """Populate the dictionaries for converting tokens to integers (and vice-versa)."""
         self.init_vocab()
         self.add_word(self.start_word)
         self.add_word(self.end_word)
         self.add_word(self.unk_word)
-        self.add_captions()
-    
+        self.add_captions(annotations=annotations)
+
     def init_vocab(self):
         """Initialize the dictionaries for converting tokens to integers (and vice-versa)."""
         self.word2idx = {}
@@ -74,17 +75,15 @@ class Vocabulary(object):
             self.idx2word[self.idx] = word
             self.idx += 1
 
-    def add_captions(self):
+    def add_captions(self, annotations):
         """Loop over training captions and add all tokens to the vocabulary that meet or exceed the threshold."""
-        coco = COCO(self.annotations_file)
         counter = Counter()
-        ids = coco.anns.keys()
+        ids = annotations.keys()
         for i, id in enumerate(ids):
-            caption = str(coco.anns[id]['caption'])
-            tokens = nltk.tokenize.word_tokenize(caption.lower())
+            tokens = str(annotations[id])
             counter.update(tokens)
 
-            if i % 100000 == 0:
+            if i % 5000 == 0:
                 print("[%d/%d] Tokenizing captions..." % (i, len(ids)))
 
         words = [word for word, cnt in counter.items() if cnt >= self.vocab_threshold]
